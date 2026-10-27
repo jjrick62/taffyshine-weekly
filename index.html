@@ -659,7 +659,7 @@
             取 30 天看，是很规整的昼夜周期，每天两个高峰。峰值能到 3000 以上。
           </p>
           <figure>
-            <img src="assets/cf_series.png" alt="CityFlow 单路口流量曲线">
+            <img src="assets/cf_series.jpg" alt="CityFlow 单路口流量曲线">
             <figcaption>INT_001 前 720 小时。单路口单小时最高 2179，全表最高 3162</figcaption>
           </figure>
         </div>
@@ -670,7 +670,7 @@
             形状完全一样，只是整体上下缩放。说明这 100 个路口是同一个模板生成的。
           </p>
           <figure>
-            <img src="assets/cf_overlay.png" alt="10 个路口的流量曲线叠加">
+            <img src="assets/cf_overlay.jpg" alt="10 个路口的流量曲线叠加">
             <figcaption>红的是 INT_001，灰色是另外 9 个。连起伏的时间点都对齐</figcaption>
           </figure>
         </div>
@@ -682,7 +682,7 @@
             100% 的组合都在 0.8 以上。图里几乎全是同一个色阶。
           </p>
           <figure>
-            <img src="assets/cf_corr.png" alt="40 个路口的相关矩阵" style="max-width:420px">
+            <img src="assets/cf_corr.jpg" alt="40 个路口的相关矩阵" style="max-width:420px">
             <figcaption>色标范围是 0.90–1.00，即使这样压窄，格子之间也几乎没有差别</figcaption>
           </figure>
         </div>
@@ -766,7 +766,7 @@
       </p>
 
       <figure>
-        <img src="assets/ladder.png" alt="参数量与误差的关系">
+        <img src="assets/ladder.jpg" alt="参数量与误差的关系">
         <figcaption>横轴参数量（对数刻度），纵轴 MAE。0 → 2 这一步是往上走的</figcaption>
       </figure>
 
@@ -909,7 +909,7 @@
       </p>
 
       <figure>
-        <img src="assets/layer1.png" alt="四个卷积核的输出">
+        <img src="assets/layer1.jpg" alt="四个卷积核的输出">
         <figcaption>
           从左到右：原图、垂直边缘、水平边缘、拉普拉斯、模糊。
           垂直核让旗杆和衣领这类竖线亮起来，水平核让帽檐和肩章这类横线亮起来。
@@ -917,7 +917,7 @@
       </figure>
 
       <figure>
-        <img src="assets/layer2.png" alt="第二层卷积输出">
+        <img src="assets/layer2.jpg" alt="第二层卷积输出">
         <figcaption>
           把第一层的垂直边缘图再卷一次。第一层看到的是一条竖线，
           第二层看到的是「几条竖线怎么排列」——层数越深，特征越抽象。
