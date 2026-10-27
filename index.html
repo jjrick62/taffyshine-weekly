@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WEEK 01 · 从单神经元到卷积</title>
+<style>
+  :root {
+    --bg: #f7f7f3;
+    --ink: #050505;
+    --mute: rgba(0, 0, 0, .64);
+    --faint: rgba(0, 0, 0, .44);
+    --line: rgba(0, 0, 0, .14);
+    --pass: 10s;
+    --sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+    --mono: "JetBrains Mono", "Consolas", monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16.5px;
+    line-height: 1.82;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+  }
+  a { color: inherit; text-decoration: none; }
+
+  .shell {
+    position: relative;
+    min-height: 100vh;
+    /* clip 而不是 hidden：hidden 会让 sticky 失效 */
+    overflow: clip;
+    background: var(--bg);
+  }
+
+  .grid-field {
+    position: fixed;
+    inset: 34px clamp(20px, 4vw, 54px) 38px;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    mask-image:
+      linear-gradient(90deg, transparent 0, #000 7%, #000 93%, transparent 100%),
+      linear-gradient(180deg, transparent 0, #000 8%, #000 92%, transparent 100%);
+    mask-composite: intersect;
+  }
+  .grid-field::before,
+  .grid-field::after { content: ""; position: absolute; inset: 0; }
+  .grid-field::before {
+    background:
+      linear-gradient(rgba(0,0,0,.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,0,0,.045) 1px, transparent 1px);
+    background-size: 96px 96px;
+  }
+  .grid-field::after {
+    background:
+      linear-gradient(rgba(0,0,0,.74) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,0,0,.74) 1px, transparent 1px);
+    background-size: 96px 96px;
+    mask-image: linear-gradient(112deg,
+      transparent 0%, transparent 31%,
+      rgba(0,0,0,.16) 40%, #000 49%, rgba(0,0,0,.22) 58%,
+      transparent 70%, transparent 100%);
+    mask-size: 250% 100%;
+    animation: grid-pass var(--pass) cubic-bezier(.7, 0, .16, 1) infinite;
+  }
+  @keyframes grid-pass {
+    0%       { mask-position: 145% 0; opacity: 0; }
+    15%, 72% { opacity: 1; }
+    100%     { mask-position: -135% 0; opacity: 0; }
+  }
+
+  .grid-ray {
+    position: absolute;
+    inset: -42% auto -42% -28%;
+    width: 26%;
+    transform: rotate(22deg);
+    background: linear-gradient(90deg, transparent,
+      rgba(0,0,0,.026), rgba(0,0,0,.075),
+      rgba(255,255,255,.42), rgba(0,0,0,.035), transparent);
+    filter: blur(20px);
+    mix-blend-mode: multiply;
+    opacity: .55;
+    animation: ray-pass var(--pass) cubic-bezier(.7, 0, .16, 1) infinite;
+    pointer-events: none;
+  }
+  @keyframes ray-pass {
+    0%       { translate: 0 0; opacity: 0; }
+    16%, 72% { opacity: .55; }
+    100%     { translate: 520% 0; opacity: 0; }
+  }
+
+  .shell::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background:
+      linear-gradient(90deg, var(--bg) 0, rgba(247,247,243,.96) 3.4%,
+        transparent 8.4%, transparent 91.6%,
+        rgba(247,247,243,.96) 96.6%, var(--bg) 100%),
+      linear-gradient(180deg, var(--bg) 0, rgba(247,247,243,.96) 4.6%,
+        transparent 10.5%, transparent 90%,
+        rgba(247,247,243,.96) 96.4%, var(--bg) 100%);
+  }
+
+  .page {
+    position: relative;
+    z-index: 2;
+    width: min(1120px, calc(100% - clamp(40px, 9vw, 132px)));
+    margin: 0 auto;
+  }
+
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 26px 0 0;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--faint);
+  }
+  .topbar b { font-weight: 400; color: var(--ink); }
+
+  .hero {
+    min-height: 82vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding-bottom: 56px;
+  }
+  .hero-tag {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--faint);
+    margin-bottom: 20px;
+  }
+  h1 {
+    margin: 0;
+    font-size: clamp(54px, 9vw, 116px);
+    font-weight: 900;
+    line-height: .87;
+    letter-spacing: -1.5px;
+  }
+  .hero-sub {
+    max-width: 620px;
+    margin: 24px 0 0;
+    color: var(--mute);
+    font-size: 17px;
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    margin-top: 48px;
+    border-top: 1px solid var(--ink);
+    border-bottom: 1px solid var(--ink);
+  }
+  .stat { padding: 18px 18px 20px 0; }
+  .stat + .stat { padding-left: 18px; border-left: 1px solid var(--line); }
+  .stat-n {
+    font-family: var(--mono);
+    font-size: 27px;
+    line-height: 1.1;
+    margin-bottom: 6px;
+  }
+  .stat-l { font-size: 12.5px; color: var(--mute); line-height: 1.5; }
+
+  /* 本周工作导航 */
+  .worklog { padding: 8px 0 60px; }
+  .wl-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--ink);
+    margin-bottom: 4px;
+  }
+  .wl-kicker {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--faint);
+  }
+  .wl-sum { font-size: 12.5px; color: var(--mute); }
+
+  .wl-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0 22px;
+  }
+  @media (max-width: 980px) {
+    .wl-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 560px) {
+    .wl-grid { grid-template-columns: 1fr; }
+  }
+  .wl-item {
+    display: grid;
+    grid-template-columns: 26px 1fr;
+    gap: 10px;
+    padding: 13px 0;
+    border-bottom: 1px solid var(--line);
+    transition: background .14s ease;
+  }
+  .wl-item:hover { background: rgba(0,0,0,.028); }
+  .wl-item:hover .wl-t { text-decoration: underline; text-underline-offset: 3px; }
+  .wl-n {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--faint);
+    padding-top: 3px;
+  }
+  .wl-t { font-size: 14.5px; font-weight: 600; line-height: 1.4; }
+  .wl-d {
+    font-size: 12.5px;
+    color: var(--mute);
+    line-height: 1.55;
+    margin-top: 3px;
+  }
+  .wl-link .wl-d { color: var(--ink); }
+  .wl-link .wl-t::after {
+    content: " ↗";
+    font-size: 11px;
+    color: var(--faint);
+  }
+
+  .quicklinks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .quicklink {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: var(--ink);
+    color: var(--bg);
+    font-size: 14.5px;
+    font-weight: 500;
+    border: 1px solid var(--ink);
+    transition: background .16s ease, color .16s ease;
+  }
+  .quicklink:hover { background: transparent; color: var(--ink); }
+  .quicklink .ar { font-family: var(--mono); font-size: 13px; }
+
+  .block {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 38px;
+    padding: 70px 0;
+    border-top: 1px solid var(--line);
+  }
+  .label { position: sticky; top: 26px; align-self: start; }
+  .idx {
+    display: block;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--faint);
+    margin-bottom: 10px;
+  }
+  h2 {
+    margin: 0;
+    font-size: clamp(24px, 3.2vw, 37px);
+    font-weight: 850;
+    line-height: 1.04;
+    letter-spacing: -.8px;
+  }
+  h3 {
+    margin: 30px 0 10px;
+    font-size: 15.5px;
+    font-weight: 700;
+    letter-spacing: -.2px;
+  }
+  h3:first-child { margin-top: 0; }
+
+  .body {
+    background:
+      linear-gradient(135deg, rgba(255,255,255,.78), rgba(255,255,255,.62)),
+      rgba(255,255,255,.48);
+    backdrop-filter: blur(32px) saturate(1.16);
+    -webkit-backdrop-filter: blur(32px) saturate(1.16);
+    border: 1px solid rgba(0,0,0,.09);
+    box-shadow:
+      inset 0 1px rgba(255,255,255,.94),
+      0 22px 56px rgba(0,0,0,.055);
+    padding: 26px 30px 30px;
+  }
+  .body > :first-child { margin-top: 0; }
+  .body p { margin: 0 0 15px; }
+  .body p:last-child { margin-bottom: 0; }
+  .dim { color: var(--mute); }
+  strong { font-weight: 600; }
+  code {
+    font-family: var(--mono);
+    font-size: .88em;
+    background: rgba(0,0,0,.055);
+    padding: 1px 5px;
+  }
+
+  .premise {
+    border-top: 1px solid var(--ink);
+    border-bottom: 1px solid var(--ink);
+    padding: 4px 0;
+    margin: 12px 0 0;
+  }
+  .pre-row {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    gap: 16px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 14.5px;
+  }
+  .pre-row:last-child { border-bottom: 0; }
+  .pre-row span {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--faint);
+    padding-top: 2px;
+  }
+  .pre-row b { font-weight: 400; }
+
+  .keypoints { border-top: 1px solid var(--ink); margin-top: 22px; }
+  .kp {
+    display: grid;
+    grid-template-columns: 30px 1fr;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .kp-n {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--faint);
+    padding-top: 3px;
+  }
+  .kp-t { font-size: 15.5px; line-height: 1.75; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    font-weight: 400;
+    color: var(--faint);
+    padding: 0 12px 9px 0;
+    border-bottom: 1px solid var(--ink);
+  }
+  td { padding: 11px 12px 11px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td.n, th.n { font-family: var(--mono); text-align: right; font-size: 14px; }
+  tr.mark td { background: rgba(0,0,0,.05); font-weight: 600; }
+  td.weak { color: var(--faint); }
+
+  figure { margin: 16px 0 0; }
+  figure img {
+    width: 100%;
+    display: block;
+    border: 1px solid var(--line);
+    background: #fff;
+  }
+  figcaption {
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--mute);
+  }
+
+  .lit-shots {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .lit-shots figure { margin: 0; }
+  .lit-shots figcaption { font-size: 12.5px; }
+
+  /* 检查图组 */
+  .checks { margin-top: 8px; }
+  .check {
+    padding: 18px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .check:first-child { border-top: 1px solid var(--ink); }
+  .check-t {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .check-d { font-size: 14.5px; color: var(--mute); margin: 0 0 12px; }
+
+  .next {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    font-size: 15px;
+    color: var(--mute);
+  }
+  .next::before { content: "→ "; color: var(--ink); }
+
+  .find-item {
+    padding: 18px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .find-item:first-child { border-top: 1px solid var(--ink); }
+  .find-t { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .find-item p { font-size: 15px; color: var(--mute); margin: 0; }
+  .find-item p + p { margin-top: 8px; }
+
+  /* 跳转链接 */
+  .pagelinks {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 22px;
+  }
+  .pagelink {
+    display: block;
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,.5);
+    padding: 14px 16px;
+    transition: border-color .16s ease, background .16s ease;
+  }
+  .pagelink:hover {
+    border-color: rgba(0,0,0,.45);
+    background: rgba(255,255,255,.78);
+  }
+  .pagelink-k {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--faint);
+    display: block;
+    margin-bottom: 4px;
+  }
+  .pagelink-t { font-size: 15px; font-weight: 600; }
+  .pagelink-d { font-size: 13px; color: var(--mute); margin-top: 4px; }
+
+  .road { margin: 0; padding: 0; list-style: none; }
+  .road li {
+    position: relative;
+    display: grid;
+    grid-template-columns: 54px 1fr;
+    gap: 16px;
+    padding-bottom: 24px;
+  }
+  .road li:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    top: 16px; bottom: 0; left: 4px;
+    width: 1px;
+    background: var(--line);
+  }
+  .road li::after {
+    content: "";
+    position: absolute;
+    top: 13px; left: 0;
+    width: 9px; height: 9px;
+    border: 1px solid var(--ink);
+    background: var(--bg);
+  }
+  .road-k {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--faint);
+    padding-top: 2px;
+  }
+  .road-t { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .road-d { font-size: 15px; color: var(--mute); }
+
+  footer {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 24px 0 60px;
+    border-top: 1px solid var(--ink);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--faint);
+  }
+
+  @media (max-width: 900px) {
+    .block { grid-template-columns: 1fr; gap: 22px; padding: 50px 0; }
+    .label { position: static; }
+    .stats { grid-template-columns: 1fr; }
+    .stat + .stat { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); }
+    .body { padding: 20px 20px 24px; }
+    .lit-shots, .pagelinks { grid-template-columns: 1fr; }
+    .hero { min-height: 72vh; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .grid-field::after, .grid-ray { animation: none; }
+    .grid-field::after { mask-position: 50% 0; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+<div class="grid-field"></div>
+<div class="grid-ray"></div>
+
+<div class="page">
+
+  <div class="topbar">
+    <span>WEEK <b>01</b> · 2026.10.21 — 10.28</span>
+    <span>交通预测 · 信号交叉口</span>
+  </div>
+
+  <!-- ===== 封面 ===== -->
+  <section class="hero">
+    <div class="hero-tag">第一周</div>
+    <h1>从单神经元<br>到卷积</h1>
+    <p class="hero-sub">
+      文献读到激活函数那一节，代码从最笨的模型一路加到 225 个参数。
+      这周想弄清楚的是：加参数、加非线性，各自到底管什么用。
+    </p>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-n">1419 / 202 / 407</div>
+        <div class="stat-l">训练 / 验证 / 测试，按时间切，不打乱</div>
+      </div>
+      <div class="stat">
+        <div class="stat-n">−64%</div>
+        <div class="stat-l">相对朴素预测的 MAE 降幅<br>（160.5 → 57.5）</div>
+      </div>
+      <div class="stat">
+        <div class="stat-n">0.55</div>
+        <div class="stat-l">线性模型的 12 个权重加起来只有这么多</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 本周工作导航 ===== -->
+  <section class="worklog">
+    <div class="wl-head">
+      <span class="wl-kicker">WEEK 01 WORK LOG</span>
+      <span class="wl-sum">五条主线</span>
+    </div>
+
+    <div class="wl-grid">
+      <a class="wl-item" href="#bg">
+        <span class="wl-n">01</span>
+        <div>
+          <div class="wl-t">文献与概念</div>
+          <div class="wl-d">马永杰 2021 读到激活函数；单神经元、两层网络、卷积</div>
+        </div>
+      </a>
+      <a class="wl-item" href="#data">
+        <span class="wl-n">02</span>
+        <div>
+          <div class="wl-t">数据与实验</div>
+          <div class="wl-d">三个数据集核实，四个模型递进对比</div>
+        </div>
+      </a>
+      <a class="wl-item" href="#error">
+        <span class="wl-n">03</span>
+        <div>
+          <div class="wl-t">分析结论</div>
+          <div class="wl-d">收缩现象，CNN 与 GNN 的适用边界</div>
+        </div>
+      </a>
+      <a class="wl-item" href="#next">
+        <span class="wl-n">04</span>
+        <div>
+          <div class="wl-t">下阶段目标</div>
+          <div class="wl-d">数据获取、文献补充、模型实现、论文复现</div>
+        </div>
+      </a>
+      <a class="wl-item wl-link" href="study_notes.html" target="_blank" rel="noopener">
+        <span class="wl-n">05</span>
+        <div>
+          <div class="wl-t">学习笔记</div>
+          <div class="wl-d">文献原文、电子笔记、纸质笔记 →</div>
+        </div>
+      </a>
+    </div>
+
+    <div class="quicklinks">
+      <a class="quicklink" href="study_notes.html" target="_blank" rel="noopener">
+        学习笔记 <span class="ar">→</span>
+      </a>
+      <a class="quicklink" href="hidden_layer.html" target="_blank" rel="noopener">
+        隐藏层解剖 <span class="ar">→</span>
+      </a>
+      <a class="quicklink" href="cnn_conv.html" target="_blank" rel="noopener">
+        卷积核可视化 <span class="ar">→</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ===== 01 研究背景 ===== -->
+  <section class="block" id="bg">
+    <div class="label">
+      <span class="idx">01</span>
+      <h2>研究背景</h2>
+    </div>
+    <div class="body">
+      <p>
+        读的是马永杰 2021 那篇综述：交通运输工程学报 21(4): 48–71，146 篇参考文献。
+        它把卷积神经网络在智能交通里的应用梳理成五类——车牌、车型、交通标志、交通事件、交通状态预测。
+      </p>
+      <p>
+        框架是清楚的。但卷积层内部到底怎么算，综述只给结论不给过程，
+        读完还是没底。所以决定先自己实现一遍，再回头看那几节。
+      </p>
+      <p>
+        读到激活函数时，顺手把整个结构整理成了一份笔记：卷积层提取局部特征，
+        同一张特征图里的神经元共享权重；池化层跟在卷积层后面做降采样，防止特征维度过高，
+        方法分基于值、概率、等级、转换域四类；激活函数提供非线性，常用 Sigmoid、Tanh、ReLU；
+        训练是前向算每层状态、算误差、反向传播、对权重和偏置求导这四步。
+      </p>
+
+      <div class="lit-shots">
+        <figure>
+          <img src="assets/lit_p01.jpg" alt="论文题录页">
+          <figcaption>题录页。摘要里圈了几处，还有几条划的线</figcaption>
+        </figure>
+        <figure>
+          <img src="assets/lit_p10.jpg" alt="激活函数对比表">
+          <figcaption>论文第 56 页。表 3 列了九个激活函数，ReLU 那行的缺点写着「易出现神经元死亡现象」</figcaption>
+        </figure>
+      </div>
+
+      <p class="dim">
+        五类应用里，只有「交通状态预测」跟信号交叉口方向对得上，其余四类偏视觉识别。
+        下周打算把田秀娟 2018 和 2025 那篇信号交叉口的论文补上。
+      </p>
+
+      <p class="next">要动手，得先找一份能跑的数据。</p>
+    </div>
+  </section>
+
+  <!-- ===== 02 数据来源 ===== -->
+  <section class="block" id="data">
+    <div class="label">
+      <span class="idx">02</span>
+      <h2>数据来源</h2>
+    </div>
+    <div class="body">
+      <p>
+        手上三个数据集。SUMO 是仿真器导出的单路口记录，本来想用它看数据格式；
+        CN+ 是唯一一份真实路口检测数据，15022 条、14 个进口道，但 23 天里只有零散片段，接不成序列；
+        CityFlow 有 100 个路口、3 个月、小时级，序列最长，所以选它的 <code>INT_001</code> 做实验。
+      </p>
+      <p>
+        这是练手的选择，不是研究的选择。用之前我先简单测了一下 CityFlow，做了三个检查。
+      </p>
+
+      <div class="checks">
+        <div class="check">
+          <div class="check-t">检查一：单条曲线长什么样</div>
+          <p class="check-d">
+            取 30 天看，是很规整的昼夜周期，每天两个高峰。峰值能到 3000 以上。
+          </p>
+          <figure>
+            <img src="assets/cf_series.png" alt="CityFlow 单路口流量曲线">
+            <figcaption>INT_001 前 720 小时。单路口单小时最高 2179，全表最高 3162</figcaption>
+          </figure>
+        </div>
+
+        <div class="check">
+          <div class="check-t">检查二：把 10 个路口叠在一起</div>
+          <p class="check-d">
+            形状完全一样，只是整体上下缩放。说明这 100 个路口是同一个模板生成的。
+          </p>
+          <figure>
+            <img src="assets/cf_overlay.png" alt="10 个路口的流量曲线叠加">
+            <figcaption>红的是 INT_001，灰色是另外 9 个。连起伏的时间点都对齐</figcaption>
+          </figure>
+        </div>
+
+        <div class="check">
+          <div class="check-t">检查三：算 40 个路口的相关矩阵</div>
+          <p class="check-d">
+            两两相关系数均值 0.9870，最低 0.9783，最高的 0.9957。
+            100% 的组合都在 0.8 以上。图里几乎全是同一个色阶。
+          </p>
+          <figure>
+            <img src="assets/cf_corr.png" alt="40 个路口的相关矩阵" style="max-width:420px">
+            <figcaption>色标范围是 0.90–1.00，即使这样压窄，格子之间也几乎没有差别</figcaption>
+          </figure>
+        </div>
+      </div>
+
+      <p style="margin-top:20px">
+        三个检查指向同一件事：<strong>这个数据集没有空间结构</strong>，做不了多路口建模。
+        另外它虽然带 <code>signal_cycle_seconds</code>、<code>green_light_duration</code>、<code>queue_length</code>
+        这些字段，看上去正好对上信号交叉口，但都是小时级聚合后的合成值，做不了分钟级分析。
+      </p>
+
+      <p class="next">数据既然只能练流程，那就从最笨的模型开始搭。</p>
+    </div>
+  </section>
+
+  <!-- ===== 03 模型递进 ===== -->
+  <section class="block" id="models">
+    <div class="label">
+      <span class="idx">03</span>
+      <h2>模型递进</h2>
+    </div>
+    <div class="body">
+      <p>
+        数据集用 CityFlow 里的 <code>INT_001</code>，一共 2040 个连续小时点。
+        用滑动窗口切成 2028 个样本：每个样本取连续 12 个小时的车辆数当输入，
+        紧跟着的那 1 个小时当答案。
+      </p>
+      <p>
+        按时间顺序切成三段，不打乱：前 1419 个训练，接着 202 个验证，最后 407 个测试。
+        标准化用的均值和标准差只从训练集算，验证集和测试集用同一组数换算。
+      </p>
+      <p>
+        四个模型的输入输出完全一样，区别只在内部怎么把 12 个数变成一个数：
+        朴素预测直接取最后一个数；单神经元给最后一个数配一个权重和一个偏置；
+        线性回归给 12 个数各配一个权重；两层 MLP 先把 12 个数升到 16 维、过一道 ReLU，再压回 1 维。
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>模型</th>
+            <th class="n">参数</th>
+            <th class="n">MAE</th>
+            <th class="n">RMSE</th>
+            <th class="n">MAPE</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>朴素预测：拿上一小时直接用</td>
+            <td class="n">0</td>
+            <td class="n">160.49</td>
+            <td class="n">253.05</td>
+            <td class="n">29.50%</td>
+          </tr>
+          <tr>
+            <td>单神经元：<code>y = w·x₁₂ + b</code></td>
+            <td class="n">2</td>
+            <td class="n weak">169.58</td>
+            <td class="n">246.76</td>
+            <td class="n">39.16%</td>
+          </tr>
+          <tr>
+            <td>线性回归：12 个输入加权求和</td>
+            <td class="n">13</td>
+            <td class="n">153.25</td>
+            <td class="n">196.93</td>
+            <td class="n">49.10%</td>
+          </tr>
+          <tr class="mark">
+            <td>两层 MLP：12 → 16 → 1，中间有 ReLU</td>
+            <td class="n">225</td>
+            <td class="n">57.54</td>
+            <td class="n">90.93</td>
+            <td class="n">19.45%</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="dim" style="font-size:13.5px;margin-top:12px">
+        MAE、RMSE 单位是辆/小时。学习率 0.05，最多 6000 轮，验证集连续 200 轮不降就停。
+      </p>
+
+      <figure>
+        <img src="assets/ladder.png" alt="参数量与误差的关系">
+        <figcaption>横轴参数量（对数刻度），纵轴 MAE。0 → 2 这一步是往上走的</figcaption>
+      </figure>
+
+      <p style="margin-top:20px">
+        加 2 个参数，反而比不加更差。加到 13 个，只比朴素预测好了 7 辆。
+        一直到加了隐藏层和非线性，才出现断层式的下降。
+      </p>
+
+      <h3>这批结果能推广到哪</h3>
+      <div class="premise">
+        <div class="pre-row"><span>空间</span><b>只有一个路口，没有相邻路口的信息</b></div>
+        <div class="pre-row"><span>时间</span><b>小时级，不是分钟级</b></div>
+        <div class="pre-row"><span>来源</span><b>仿真生成的合成数据，不是真实检测器记录</b></div>
+        <div class="pre-row"><span>任务</span><b>只预测流量，不涉及排队长度和信号配时</b></div>
+      </div>
+
+      <div class="keypoints">
+        <div class="kp">
+          <span class="kp-n">01</span>
+          <div class="kp-t">
+            在这个单路口小时级任务上，参数从 0 加到 225，MAE 从 160.5 降到 57.5。
+            但<strong>加 2 个参数那一步反而变差</strong>（169.6），
+            说明在这个数据上，参数数量本身不是决定因素。
+          </div>
+        </div>
+        <div class="kp">
+          <span class="kp-n">02</span>
+          <div class="kp-t">
+            性能断层出现在<strong>加入非线性</strong>那一步。线性模型的 12 个权重加起来只有 0.5474，
+            预测被压向训练均值 617，这是它在低流量段误差最大的直接原因。
+          </div>
+        </div>
+        <div class="kp">
+          <span class="kp-n">03</span>
+          <div class="kp-t">
+            上面两条<strong>只在流程和代码层面成立，不能当研究结论</strong>。
+            数据是合成的、没有空间差异，真实数据到位后要全部重跑。
+          </div>
+        </div>
+      </div>
+
+      <p class="next">那前面这三级到底在干什么，为什么加了参数反而更差？</p>
+    </div>
+  </section>
+
+  <!-- ===== 04 误差机制 ===== -->
+  <section class="block" id="error">
+    <div class="label">
+      <span class="idx">04</span>
+      <h2>误差机制</h2>
+    </div>
+    <div class="body">
+      <p>
+        把四个模型拆开看，前三个其实在做同一件事。
+        上一小时的流量和下一小时的相关系数是 0.9016，本来就是最强的预测因子，
+        但它们的权重都不是原样传下去。
+      </p>
+
+      <div class="find">
+        <div class="find-item">
+          <div class="find-t">单神经元学出 w = 0.8978</div>
+          <p>
+            只有一个权重，训练完是 0.8978，偏置约等于 0。
+            意思是「把上一小时的值打九折」。
+          </p>
+          <p>
+            打九折之后，大误差被压小了（RMSE 从 253.05 降到 246.76），
+            但普通点的误差反而变大（MAE 从 160.49 涨到 169.58）。
+            这就是收缩估计的典型代价。
+          </p>
+        </div>
+
+        <div class="find-item">
+          <div class="find-t">线性回归的 12 个权重，加起来只有 0.5474</div>
+          <p>
+            其中上一小时的权重是 0.9949，看着像「照抄」。
+            但其余 11 个权重有正有负，净贡献是 −0.4474。
+            合起来，这个模型对输入的响应强度只有一半。
+          </p>
+          <p>
+            所以它不是「抄上一小时」，是一个<strong>收缩的滞后模型</strong>：
+            稳态下预测值只有真实值的一半，会被拉向训练均值 617。
+            低流量时段真实只有一两百，它还在报几百，百分比误差就上去了。
+          </p>
+        </div>
+
+        <div class="find-item">
+          <div class="find-t">加了非线性之后，低流量段才追平朴素预测</div>
+          <p>按真实流量分档看百分比误差：</p>
+          <table style="margin-top:10px">
+            <thead>
+              <tr>
+                <th>真实流量（辆/小时）</th>
+                <th class="n">样本</th>
+                <th class="n">朴素</th>
+                <th class="n">单神经元</th>
+                <th class="n">线性</th>
+                <th class="n">两层 MLP</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>0 – 300</td><td class="n">219</td><td class="n">28.0</td><td class="n">47.8</td><td class="n">74.5</td><td class="n">28.8</td></tr>
+              <tr><td>300 – 600</td><td class="n">12</td><td class="n">61.7</td><td class="n">54.8</td><td class="n">35.1</td><td class="n">12.4</td></tr>
+              <tr><td>600 – 1000</td><td class="n">38</td><td class="n">69.2</td><td class="n">62.2</td><td class="n">33.9</td><td class="n">23.4</td></tr>
+              <tr><td>1000 以上</td><td class="n">138</td><td class="n">18.1</td><td class="n">17.7</td><td class="n">14.3</td><td class="n">4.1</td></tr>
+            </tbody>
+          </table>
+          <p style="margin-top:10px">
+            0–300 档占测试集一半以上。两层 MLP 在这一档是 28.8%，
+            朴素预测 28.0%——<strong>只是追平，没有超过</strong>。
+            它真正的优势在 1000 以上那档，4.1% 对 18.1%。
+          </p>
+        </div>
+      </div>
+
+      <p style="margin-top:20px">
+        所以准确的说法是：非线性的价值不在「修好低流量」，而在
+        <strong>让模型有余力同时拟合低流量和高流量两种形态</strong>。
+        线性模型只有一条斜率，MLP 可以分段。
+      </p>
+
+      <p class="next">到这里，全连接网络能做的都做完了。那卷积呢？</p>
+    </div>
+  </section>
+
+  <!-- ===== 05 卷积验证 ===== -->
+  <section class="block" id="conv">
+    <div class="label">
+      <span class="idx">05</span>
+      <h2>卷积验证</h2>
+    </div>
+    <div class="body">
+      <p>
+        回到文献里没读懂的那部分。卷积层和全连接层最大的差别是权重共享：
+        一个 3×3 的核只有 9 个权重，却要在整张图上反复用。
+      </p>
+      <p>
+        我拿一张人脸照片试了试。核是人工指定的经典算子，不是训练出来的，
+        目的只是看清楚「卷积」这一步在干什么。
+      </p>
+
+      <figure>
+        <img src="assets/layer1.png" alt="四个卷积核的输出">
+        <figcaption>
+          从左到右：原图、垂直边缘、水平边缘、拉普拉斯、模糊。
+          垂直核让旗杆和衣领这类竖线亮起来，水平核让帽檐和肩章这类横线亮起来。
+        </figcaption>
+      </figure>
+
+      <figure>
+        <img src="assets/layer2.png" alt="第二层卷积输出">
+        <figcaption>
+          把第一层的垂直边缘图再卷一次。第一层看到的是一条竖线，
+          第二层看到的是「几条竖线怎么排列」——层数越深，特征越抽象。
+        </figcaption>
+      </figure>
+
+      <p style="margin-top:20px">
+        卷积层摊开来看，就是四个位置各拉成一行，乘同一个列向量。
+        全连接层每行的权重都不一样，卷积层用的是同一组。
+      </p>
+
+      <h3>但路网不适合用卷积</h3>
+      <p>
+        马永杰那篇列的五类应用——车牌、车型、交通标志、交通事件、交通状态——
+        前四类本质都是图像识别。它们的数据是规则网格，每个像素和上下左右严格相邻、间距相等。
+        卷积核能这么滑，靠的就是这个前提。
+      </p>
+      <p>
+        路网不满足这个前提。路口之间有的连、有的不连，间距不一样，还有单行和转向限制。
+        如果把路网摊成方格子，等于假设所有相邻路口都等距、每个格子都恰好对应一个路口，
+        这个假设在真实城市里不成立。
+      </p>
+      <p>
+        更合适的表示是图：路口当节点，道路当边。
+        GNN（Graph Neural Network，图神经网络）直接在图上做消息传递，
+        每个节点从和它相连的邻居那里收信息，再更新自己的状态。
+        这跟卷积其实是一回事——都是从邻居聚合信息，区别只在邻居的定义：
+        卷积的邻居是「网格上上下左右的格子」，图卷积的邻居是「图上连着的那些点」。
+      </p>
+      <p class="dim">
+        所以这一阶段的方向判断是：CNN 用在交通里的图像类任务（车牌、标志、事件检测），
+        路网时空预测走 GNN。下周开始啃这部分。
+      </p>
+
+      <h3>可以点进去看细节</h3>
+      <div class="pagelinks">
+        <a class="pagelink" href="hidden_layer.html" target="_blank" rel="noopener">
+          <span class="pagelink-k">HIDDEN LAYER</span>
+          <div class="pagelink-t">隐藏层解剖</div>
+          <div class="pagelink-d">16 个神经元各自的权重、z 和 h，以及 4 个激活的值</div>
+        </a>
+        <a class="pagelink" href="cnn_conv.html" target="_blank" rel="noopener">
+          <span class="pagelink-k">CONVOLUTION</span>
+          <div class="pagelink-t">卷积核可视化</div>
+          <div class="pagelink-d">滑窗动画、九个核的逐项相乘、两层卷积对比</div>
+        </a>
+      </div>
+
+      <p class="next">这一路的所有数字，都建立在一个有问题的数据上。</p>
+    </div>
+  </section>
+
+  <!-- ===== 06 下阶段计划 ===== -->
+  <section class="block" id="next">
+    <div class="label">
+      <span class="idx">06</span>
+      <h2>下阶段计划</h2>
+    </div>
+    <div class="body">
+      <p>
+        这周的结论只到「流程跑通、代码没错」。要往下走，第一步不是换模型，是把数据解决掉。
+      </p>
+
+      <ul class="road">
+        <li>
+          <span class="road-k">数据</span>
+          <div>
+            <div class="road-t">把可用数据找到</div>
+            <div class="road-d">
+              三条路：问老师有没有检测器数据；申请国家基础学科公共数据中心那套
+              （约 10GB，含信号交叉口）；或者找公开的真实信号交叉口数据集。
+              这件事排最前面，没有数据后面都是空转。
+            </div>
+          </div>
+        </li>
+        <li>
+          <span class="road-k">文献</span>
+          <div>
+            <div class="road-t">读两篇信号交叉口的论文</div>
+            <div class="road-d">
+              田秀娟 2018《交叉口短时流量 CEEMDAN-PE-OSELM 预测模型》，
+              和 2025 年那篇 Urban Signalized Intersection Traffic State Prediction。
+              这两篇方向才对得上，马永杰那篇偏视觉识别。
+            </div>
+          </div>
+        </li>
+        <li>
+          <span class="road-k">实现</span>
+          <div>
+            <div class="road-t">GNN 和 CNN 各写一遍</div>
+            <div class="road-d">
+              不调现成库，从消息传递和卷积的前向、反向开始写。
+              目的不是产出，是理解。和数据申请冲突的话，先让给数据。
+            </div>
+          </div>
+        </li>
+        <li>
+          <span class="road-k">复现</span>
+          <div>
+            <div class="road-t">选一篇能复现的论文</div>
+            <div class="road-d">
+              等数据定下来再挑。优先选公开了数据的、只用历史流量就能跑的，
+              不追求逐位对上原文指标，能复现方法和趋势就行。
+            </div>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    <span>2026-10-28</span>
+    <span>CityFlow 为合成数据，本文所有结果仅用于验证流程，不作为研究结论</span>
+  </footer>
+
+</div>
+</div>
+</body>
+</html>
