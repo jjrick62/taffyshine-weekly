@@ -273,6 +273,28 @@
     .grid-field::after, .grid-ray { animation: none; }
     .grid-field::after { mask-position: 50% 0; }
   }
+
+  /* 工具使用声明 */
+  .disclosure {
+    display: grid;
+    grid-template-columns: 170px 1fr;
+    gap: 30px;
+    padding: 32px 0 26px;
+    border-top: 1px solid var(--line);
+  }
+  .dc-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--faint);
+    line-height: 1.6;
+  }
+  .dc-body { font-size: 13.5px; line-height: 1.85; color: var(--mute); }
+  .dc-body p { margin: 0 0 7px; }
+  .dc-body p:last-child { margin-bottom: 0; }
+  .dc-body b { color: var(--ink); font-weight: 500; }
+  @media (max-width: 860px) {
+    .disclosure { grid-template-columns: 1fr; gap: 10px; }
+  }
 </style>
 </head>
 <body>
@@ -453,6 +475,20 @@
           </figcaption>
         </figure>
       </div>
+    </div>
+  </section>
+
+  <section class="disclosure">
+    <div class="dc-label">工具使用<br>TOOLING</div>
+    <div class="dc-body">
+      <p>
+        <b>AI 参与：</b>本页的 HTML 结构与样式、PDF 页面渲染与图片压缩、纸质笔记的照片处理，
+        由 Claude 完成。
+      </p>
+      <p>
+        <b>本人完成：</b>文献阅读与圈注、电子笔记的书写、纸质本的整理。
+        文中所有笔记图片均来自本人原始材料，未作改写。
+      </p>
     </div>
   </section>
 
