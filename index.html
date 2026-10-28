@@ -8,8 +8,8 @@
   :root {
     --bg: #f7f7f3;
     --ink: #050505;
-    --mute: rgba(0, 0, 0, .64);
-    --faint: rgba(0, 0, 0, .44);
+    --mute: rgba(0, 0, 0, .74);
+    --faint: rgba(0, 0, 0, .55);
     --line: rgba(0, 0, 0, .14);
     --pass: 10s;
     --sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
@@ -22,8 +22,8 @@
     background: var(--bg);
     color: var(--ink);
     font-family: var(--sans);
-    font-size: 16.5px;
-    line-height: 1.82;
+    font-size: 17.5px;
+    line-height: 1.88;
     -webkit-font-smoothing: antialiased;
     text-rendering: geometricPrecision;
   }
@@ -216,7 +216,7 @@
   }
   .wl-t { font-size: 14.5px; font-weight: 600; line-height: 1.4; }
   .wl-d {
-    font-size: 12.5px;
+    font-size: 13.5px;
     color: var(--mute);
     line-height: 1.55;
     margin-top: 3px;
@@ -313,9 +313,9 @@
     display: grid;
     grid-template-columns: 56px 1fr;
     gap: 16px;
-    padding: 8px 0;
+    padding: 9px 0;
     border-bottom: 1px solid var(--line);
-    font-size: 14.5px;
+    font-size: 15.5px;
   }
   .pre-row:last-child { border-bottom: 0; }
   .pre-row span {
@@ -340,13 +340,13 @@
     color: var(--faint);
     padding-top: 3px;
   }
-  .kp-t { font-size: 15.5px; line-height: 1.75; }
+  .kp-t { font-size: 16px; line-height: 1.78; }
 
-  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  table { width: 100%; border-collapse: collapse; font-size: 15.5px; }
   th {
     text-align: left;
     font-family: var(--mono);
-    font-size: 11.5px;
+    font-size: 12.5px;
     font-weight: 400;
     color: var(--faint);
     padding: 0 12px 9px 0;
@@ -366,8 +366,8 @@
   }
   figcaption {
     margin-top: 8px;
-    font-size: 13px;
-    line-height: 1.6;
+    font-size: 14px;
+    line-height: 1.65;
     color: var(--mute);
   }
 
@@ -409,7 +409,7 @@
   }
   .find-item:first-child { border-top: 1px solid var(--ink); }
   .find-t { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
-  .find-item p { font-size: 15px; color: var(--mute); margin: 0; }
+  .find-item p { font-size: 15.5px; color: var(--mute); margin: 0; }
   .find-item p + p { margin-top: 8px; }
 
   /* 跳转链接 */
@@ -470,7 +470,7 @@
     padding-top: 2px;
   }
   .road-t { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
-  .road-d { font-size: 15px; color: var(--mute); }
+  .road-d { font-size: 15.5px; color: var(--mute); }
 
   footer {
     display: flex;
@@ -498,6 +498,30 @@
     .grid-field::after, .grid-ray { animation: none; }
     .grid-field::after { mask-position: 50% 0; }
   }
+
+  /* 工具使用声明 */
+  .disclosure {
+    display: grid;
+    grid-template-columns: 190px 1fr;
+    gap: 32px;
+    padding: 34px 0 30px;
+    border-top: 1px solid var(--line);
+    margin-top: 8px;
+  }
+  .dc-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--faint);
+    line-height: 1.6;
+  }
+  .dc-body { font-size: 13.5px; line-height: 1.85; color: var(--mute); }
+  .dc-body p { margin: 0 0 7px; }
+  .dc-body p:last-child { margin-bottom: 0; }
+  .dc-body b { color: var(--ink); font-weight: 500; }
+  .dc-body .sep { color: var(--faint); }
+  @media (max-width: 900px) {
+    .disclosure { grid-template-columns: 1fr; gap: 10px; }
+  }
 </style>
 </head>
 <body>
@@ -520,20 +544,6 @@
       文献读到激活函数那一节，代码从最笨的模型一路加到 225 个参数。
       这周想弄清楚的是：加参数、加非线性，各自到底管什么用。
     </p>
-    <div class="stats">
-      <div class="stat">
-        <div class="stat-n">1419 / 202 / 407</div>
-        <div class="stat-l">训练 / 验证 / 测试，按时间切，不打乱</div>
-      </div>
-      <div class="stat">
-        <div class="stat-n">−64%</div>
-        <div class="stat-l">相对朴素预测的 MAE 降幅<br>（160.5 → 57.5）</div>
-      </div>
-      <div class="stat">
-        <div class="stat-n">0.55</div>
-        <div class="stat-l">线性模型的 12 个权重加起来只有这么多</div>
-      </div>
-    </div>
   </section>
 
   <!-- ===== 本周工作导航 ===== -->
@@ -904,25 +914,84 @@
         一个 3×3 的核只有 9 个权重，却要在整张图上反复用。
       </p>
       <p>
-        我拿一张人脸照片试了试。核是人工指定的经典算子，不是训练出来的，
-        目的只是看清楚「卷积」这一步在干什么。
+        为了看清楚这件事，我画了两张交通示意图做前向验证：一张车牌，横平竖直；
+        一张路面标线，带斜向车道线和水平停止线。<strong>这里没有训练</strong>，
+        四个核是人工指定的经典算子，只做前向计算。
       </p>
 
       <figure>
-        <img src="assets/layer1.jpg" alt="四个卷积核的输出">
+        <img src="assets/pl_conv.png" alt="交通图像的四核前向卷积">
         <figcaption>
-          从左到右：原图、垂直边缘、水平边缘、拉普拉斯、模糊。
-          垂直核让旗杆和衣领这类竖线亮起来，水平核让帽檐和肩章这类横线亮起来。
+          上排是车牌，下排是路面。从左到右：原图、垂直边缘核、水平边缘核、拉普拉斯核、模糊核。
+          每张特征图下方标的是平均响应强度。
+        </figcaption>
+      </figure>
+
+      <p style="margin-top:20px">
+        结果能对上预期。车牌以横线为主——边框、京字的横、数字的横笔——
+        所以水平核的平均响应 80.4，明显高于垂直核的 47.1。
+        路面的车道线是斜的，垂直和水平两个方向的响应就差不多，29.3 对 27.5，
+        反而是拉普拉斯核把整条轮廓完整抓了下来。
+      </p>
+      <p>
+        这说明一个核就是一个特定的「模式探测器」：它只对某一方向的亮度变化敏感。
+        卷积层放几十个核，就是同时派几十个探测器去找几十种不同的模式。
+      </p>
+
+      <h3>换成训练出来的核和真实照片</h3>
+      <p>
+        上面的四个核是我指定的，图片也是我画的。换成真实的一整套：
+        加载 ResNet18，在 ImageNet 上训练过的网络，第一层有
+        <strong>64 个 7×7 的卷积核</strong>，没有任何人告诉它们该去找什么。
+        照片来自 Wikimedia，真实道路场景，CC BY-SA 4.0 授权。
+      </p>
+
+      <figure>
+        <img src="assets/rn_kernels.png" alt="ResNet18 第一层的 64 个卷积核">
+        <figcaption>
+          64 个核拉大看能分出几类：条纹状的对应不同方向的边缘，纯色块对应颜色，
+          斑点和十字状的对应角点和纹理。和上面手画的四个是同一类东西。
         </figcaption>
       </figure>
 
       <figure>
-        <img src="assets/layer2.jpg" alt="第二层卷积输出">
+        <img src="assets/rn_monitor.png" alt="路口监控画面在 ResNet 第一层的响应">
         <figcaption>
-          把第一层的垂直边缘图再卷一次。第一层看到的是一条竖线，
-          第二层看到的是「几条竖线怎么排列」——层数越深，特征越抽象。
+          路口监控画面送进去，64 个通道里挑 12 个。通道 0 和 5 专抓车牌、检测框这类高频细节，
+          通道 10 和 25 抓斑马线的水平条纹，通道 20 抓车辆和行人的整体轮廓。
         </figcaption>
       </figure>
+
+      <h3>这 64 个核统计下来是什么样</h3>
+      <p>
+        我把它们逐个算了一遍梯度强度和通道差异，分成三类：
+      </p>
+      <table>
+        <thead><tr><th>类型</th><th class="n">数量</th><th>特征</th></tr></thead>
+        <tbody>
+          <tr><td>强边缘型</td><td class="n">21 / 64</td><td>梯度大、方向明确</td></tr>
+          <tr><td>强颜色型</td><td class="n">19 / 64</td><td>三个通道形状差异大，在编码颜色</td></tr>
+          <tr><td>弱结构型</td><td class="n">16 / 64</td><td>梯度弱，其中 8 个已经死掉</td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:14px">
+        8 个死核的权重被压到 10<sup>-7</sup> 量级，L2 范数比活着的核小一千万倍。
+        原因是权重衰减每步都在把所有参数往 0 拉，而某个核如果输出长期落在 ReLU 负区间，
+        梯度恒为 0，就只剩衰减在起作用，跑够多轮就被磨没了。这跟前面说的「神经元死亡」是同一件事。
+      </p>
+      <p>
+        边缘核的方向分布也不均匀：峰值在 <strong>45° 和 135°</strong> 两条对角线，而不是水平和垂直。
+        因为真实图像里道路透视线、倾斜的车牌都是斜的，数据把最多的配额给了斜向。
+        手工设计 Sobel 只给横竖两个方向，是因为人按数学对称性做选择；
+        模型只看统计规律。
+      </p>
+
+      <p style="margin-top:20px">
+        所以手工核和训练出来的核，本质是一回事：都是方向、边缘、颜色这些初级特征探测器。
+        差别在于手工核只有四个方向可选，训练出来的是从数据里统计出的最优解，
+        可能有几十种变体。这也解释了卷积层为什么要放几十上百个核——
+        <strong>不是冗余，是每个核负责一种模式</strong>。
+      </p>
 
       <p style="margin-top:20px">
         卷积层摊开来看，就是四个位置各拉成一行，乘同一个列向量。
@@ -965,6 +1034,23 @@
           <div class="pagelink-d">滑窗动画、九个核的逐项相乘、两层卷积对比</div>
         </a>
       </div>
+
+      <h3>特征之后往哪走</h3>
+      <p>
+        卷积层只管提取，它本身不知道为什么任务服务。输出什么，取决于后面接什么。
+      </p>
+      <table>
+        <thead><tr><th>任务</th><th>输出</th><th>对到哪</th></tr></thead>
+        <tbody>
+          <tr><td>分类</td><td>一组概率</td><td>判断这是不是一辆车</td></tr>
+          <tr><td>检测</td><td>框的位置 + 类别</td><td>监控画面上的绿框红框</td></tr>
+          <tr><td>回归</td><td>一个数</td><td>下一小时流量 287</td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:14px">
+        我这个方向是回归。输入 12 个小时的流量，输出下一个小时的一个数。
+        前面提特征的卷积和池化跟图像任务一样，区别只在最后不接 softmax，直接出数值。
+      </p>
 
       <p class="next">这一路的所有数字，都建立在一个有问题的数据上。</p>
     </div>
@@ -1025,6 +1111,23 @@
           </div>
         </li>
       </ul>
+    </div>
+  </section>
+
+  <section class="disclosure">
+    <div class="dc-label">工具使用<br>TOOLING</div>
+    <div class="dc-body">
+      <p>
+        <b>AI 参与：</b>本页的 HTML 结构与样式、四个模型的实验代码、CityFlow 的检查脚本、
+        全部图表，由 Claude 生成并调试。
+      </p>
+      <p>
+        <b>本人完成：</b>文献阅读与圈注、电子笔记、纸质本整理、代码的本地运行与结果核对。
+        文中所有数字均取自实际运行输出，未作修饰。
+      </p>
+      <p>
+        <b>共同完成：</b>结论的组织与措辞，经与 Claude 讨论后确定。
+      </p>
     </div>
   </section>
 
